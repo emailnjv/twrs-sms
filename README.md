@@ -10,7 +10,7 @@ use std::env::var;
 use reqwest::StatusCode;
 use twrs_sms;
 
-fn main() -> Result<(), TWRSError> {
+fn main() -> Result<(), twrs_sms::TWRSError> {
         let tw_to = var("TW_TO").expect("Error getting $TW_TO from the environment");
         let tw_from = var("TW_FROM").expect("Error getting $TW_FROM from the environment");
         let tw_sid = var("TW_SID").expect("Error getting $TW_SID from the environment");

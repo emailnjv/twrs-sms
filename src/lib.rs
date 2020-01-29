@@ -44,9 +44,9 @@ impl Error for TWRSError {}
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
 pub struct TwilioSend<'s> {
-    Body: &'s str,
-    r#From: &'s str,
-    To: &'s str,
+    pub Body: &'s str,
+    pub r#From: &'s str,
+    pub To: &'s str,
 }
 
 /// Creates a new instance of the body that is posted to the Twilio API
