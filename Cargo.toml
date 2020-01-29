@@ -1,0 +1,19 @@
+[package]
+name = "twrs-sms"
+version = "0.1.0"
+authors = ["Ricky (Degausser) <Ricky@Hosfelt.io>"]
+edition = "2018"
+keywords = ["twilio", "bot", "http", "POST", "sms"]
+exclude = ["target", "Cargo.lock"]
+description = "Small library to send POST requests to Twilio API"
+homepage = "https://github.com/deg4uss3r/twrs-sms"
+repository = "https://github.com/deg4uss3r/twrs-sms"
+readme = "README.md"
+license-file = "LICENSE"
+
+[dependencies]
+reqwest = {version = "0.10", features = ["rustls-tls", "socks", "blocking"]}
+serde = {version = "1", features = ["derive"]}
+serde_urlencoded = "0.6"
+serde_json = "1"
+mockito = "0"
