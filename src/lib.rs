@@ -3,12 +3,13 @@ use std::error::Error;
 use std::fmt;
 
 use reqwest;
+use reqwest::Response;
+use serde::__private::fmt::Display;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_urlencoded as url_encode;
 use std::str::FromStr;
-use serde::__private::fmt::Display;
-use reqwest::Response;
 
+// TODO: Handle 400 errors and the various error codes when 201 is returned
 /// Creating a custom error for mapping Errors to return result from the library handles
 /// The possible errors are `URLEncodeFailure`, `URLDecodeFailure`, `HTTPRequestError`, and `NotDelivered`
 /// `URLDecodeFailure` maps to a `serde_json::error::Error`
@@ -20,6 +21,7 @@ pub enum TWRSError {
   URLEncodeFailure(serde_urlencoded::ser::Error),
   URLDecodeFailure(reqwest::Error),
   HTTPRequestError(reqwest::Error),
+  TwilioError(String),
   NotDelivered(String),
 }
 
@@ -34,6 +36,7 @@ impl fmt::Display for TWRSError {
       }
       TWRSError::HTTPRequestError(e) => write!(f, "Error while sending HTTP POST: {}", e),
       TWRSError::NotDelivered(e) => write!(f, "Error message not delivered: {}", e),
+      TWRSError::TwilioError(e) => write!(f, "Twilio API error: {}", e),
     }
   }
 }
@@ -68,10 +71,10 @@ impl<'s> TwilioSend<'s> {
 }
 
 pub fn deserialize_number_from_string<'de, T, D>(deserializer: D) -> Result<T, D::Error>
-  where
-      D: Deserializer<'de>,
-      T: FromStr + serde::Deserialize<'de>,
-      <T as FromStr>::Err: Display,
+where
+  D: Deserializer<'de>,
+  T: FromStr + serde::Deserialize<'de>,
+  <T as FromStr>::Err: Display,
 {
   #[derive(Deserialize)]
   #[serde(untagged)]
@@ -85,7 +88,6 @@ pub fn deserialize_number_from_string<'de, T, D>(deserializer: D) -> Result<T, D
     StringOrInt::Number(i) => Ok(i),
   }
 }
-
 
 /// Struct to deserialize the Twilio reply from the post to the API
 /// This is used to inspect the response to ensure the message was delivered
@@ -108,7 +110,7 @@ pub struct TwilioReply {
   api_version: String,
   price: Option<String>,
   price_unit: String,
-  error_code: Option<String>,
+  error_code: Option<i64>,
   error_message: Option<String>,
   uri: String,
   subresource_uris: HashMap<String, String>,
@@ -117,13 +119,9 @@ pub struct TwilioReply {
 impl TwilioReply {
   /// Deserialize the response from the Twilio API directly from the `reqwest::Response`
   /// struct
-  pub async fn decode(response: reqwest::Response) -> Result<TwilioReply, TWRSError> {
+  async fn decode(response: reqwest::Response) -> Result<TwilioReply, TWRSError> {
     response.json().await.map_err(TWRSError::URLDecodeFailure)
   }
-  pub async fn decoded(response: reqwest::Response) {
-    println!("{:#?}",response);
-  }
-
   /// Deserialize the response from a `&str`
   pub fn decode_str(response: &str) -> Result<TwilioReply, serde_json::error::Error> {
     serde_json::from_str(&response)
@@ -267,7 +265,7 @@ mod tests {
     let t: twrs_sms::TwilioSend = twrs_sms::TwilioSend {
       To: &tw_to,
       From: &tw_from,
-      Body: "Hiya",
+      Body: "Test from async; Reply STOP to unsubscribe",
     };
     let t_s = t.encode().expect("Error converting to url encoded string");
 
@@ -275,17 +273,16 @@ mod tests {
     let response = twrs_sms::send_message(&tw_sid, &tw_token, t_s)
       .await
       .expect("Error with HTTP request");
-    TwilioReply::decoded(response).await
-    //
-    // // Server responds with 201 (Created) on the initial response
+
+    // Server responds with 201 (Created) on the initial response
     // assert_eq!(StatusCode::from_u16(201).unwrap(), response.status());
-    //
-    // // Run the loop to make sure the message was delivered
-    // let delivered = twrs_sms::is_delivered(response, &tw_sid, &tw_token)
-    //   .await
-    //   .expect("Error SMS not delivered");
-    //
-    // // Checking the delivered state, and fail on an error
-    // assert_eq!(delivered, "delivered");
+
+    // Run the loop to make sure the message was delivered
+    let delivered = twrs_sms::is_delivered(response, &tw_sid, &tw_token)
+      .await
+      .expect("Error SMS not delivered");
+
+    // Checking the delivered state, and fail on an error
+    assert_eq!(delivered, "delivered");
   }
 }
